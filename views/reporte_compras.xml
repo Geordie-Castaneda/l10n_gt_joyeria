@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="asistente_compras_reporte" model="ir.ui.view">
+        <field name="name">l10n_gt_joyeria.asistente_reporte_compras</field>
+        <field name="model">l10n_gt_joyeria.asistente_reporte_compras</field>
+        <field name="arch" type="xml">
+            <form string="Libro de compras Joyeria">
+                <group>
+                    <field name="folio_inicial"/>
+                    <field name="fecha_inicio"/>
+                    <field name="fecha_fin"/>
+                    <field name="archivo" filename="name" invisible="1"/>
+                    <field name="name" invisible="1"/>
+                </group>
+                <group>
+                </group>
+                <footer>
+                    <button name="print_report_excel" string="Generar Excel" type="object" class="oe_highlight"/>
+                    <button special="cancel" string="Cerrar" class="oe_link"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="window_reporte_compras" model="ir.actions.act_window">
+        <field name="name">Libro de Compras Joyeria</field>
+        <field name="res_model">l10n_gt_joyeria.asistente_reporte_compras</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_asistente_reporte_compras" name="Libro de Compras Joyeria"
+              parent="l10n_gt_extra.menu_informes" action="window_reporte_compras" sequence="65"/>
+
+</odoo>
