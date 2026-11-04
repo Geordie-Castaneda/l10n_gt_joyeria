@@ -6,10 +6,10 @@
         <field name="arch" type="xml">
             <form string="Libro de compras Joyeria">
                 <group>
-                    <field name="folio_inicial"/>
-                    <field name="fecha_inicio"/>
-                    <field name="fecha_fin"/>
-                    <field name="archivo" filename="name" invisible="1"/>
+                    <field name="initial_folio"/>
+                    <field name="date_start"/>
+                    <field name="date_end"/>
+                    <field name="file" filename="name" invisible="1"/>
                     <field name="name" invisible="1"/>
                 </group>
                 <group>

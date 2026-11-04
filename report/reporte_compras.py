@@ -5,13 +5,13 @@ from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 
 
-class LibroCompras(models.AbstractModel):
+class PurchaseBookReport(models.AbstractModel):
     _name = 'report.l10n_gt_joyeria.reporte_compras'
 
-    def _get_conversion(self, move_id):
+    def _get_conversion(self, moves):
         conversion = {'impuesto': 0, 'total': 0}
-        total_sin_impuesto = 0
-        total_total = 0
+        total_without_tax = 0
+        grand_total = 0
 
         amount_untaxed = 0
         amount_tax = 0
@@ -22,7 +22,7 @@ class LibroCompras(models.AbstractModel):
         amount_total_signed = 0
         amount_residual_signed = 0
 
-        for move in move_id:
+        for move in moves:
             total_untaxed = 0.0
             total_untaxed_currency = 0.0
             total_tax = 0.0
@@ -100,24 +100,24 @@ class LibroCompras(models.AbstractModel):
         return conversion
 
 
-    def _get_impuesto_iva(self, tax_ids):
-        impuesto_iva = False
+    def _has_vat_tax(self, tax_ids):
+        tax_iva = False
         if len(tax_ids) > 0:
-            for linea in tax_ids:
-                if 'IVA' in linea.name:
-                    impuesto_iva = True
+            for tax in tax_ids:
+                if 'IVA' in tax.name:
+                    tax_iva = True
                     print('si hay iva')
-        return impuesto_iva
+        return tax_iva
 
 
-    def _get_compras(self, datos):
-        compras_lista = []
-        gastos_no_lista = []
+    def _get_purchases(self, report_data):
+        purchases = []
+        non_deductible_expenses = []
         print(self.env.company)
 
-        compra_ids = self.env['account.move'].search([('company_id', '=', self.env.company.id),
-                                                      ('date', '<=', datos['fecha_fin']),
-                                                      ('date', '>=', datos['fecha_inicio']), ('state', '=', 'posted'),
+        purchase_ids = self.env['account.move'].search([('company_id', '=', self.env.company.id),
+                                                      ('date', '<=', report_data['date_end']),
+                                                      ('date', '>=', report_data['date_start']), ('state', '=', 'posted'),
                                                       ('move_type', 'in', ['in_invoice', 'in_refund'])])
         total = {
             'compra': 0, 'compra_exento': 0, 'servicio': 0, 'servicio_exento': 0,
@@ -125,43 +125,43 @@ class LibroCompras(models.AbstractModel):
             'iva_por_pagar': 0, 'valor_retencion_iva': 0, 'compra_de_activos': 0,
             'credito_fiscal_periodo_anterior': 0, 'combustible': 0, 'idp': 0
         }
-        total_gastos_no = 0
-        documentos_operados = 0
-        print('JOYERIA compras: fechas=%s a %s, documentos encontrados=%s' % (datos['fecha_inicio'], datos['fecha_fin'], len(compra_ids)))
+        total_non_deductible_expenses = 0
+        processed_documents = 0
+        print('JOYERIA compras: fechas=%s a %s, documentos encontrados=%s' % (report_data['date_start'], report_data['date_end'], len(purchase_ids)))
         print()
-        if compra_ids:
+        if purchase_ids:
 
-            for compra in compra_ids:
-                print('JOYERIA documento id=%s nombre=%s tipo=%s moneda=%s' % (compra.id, compra.name, compra.move_type, compra.currency_id.name))
+            for purchase in purchase_ids:
+                print('JOYERIA documento id=%s nombre=%s tipo=%s moneda=%s' % (purchase.id, purchase.name, purchase.move_type, purchase.currency_id.name))
                 print()
-                if 'RECIB' not in compra.journal_id.code:
+                if 'RECIB' not in purchase.journal_id.code:
 
-                    if hasattr(compra, 'feel_serie') and compra.feel_serie:
-                        serie = compra.feel_serie
-                    elif hasattr(compra, 'serie_factura') and compra.serie_factura:
-                        serie = compra.serie_factura
+                    if hasattr(purchase, 'feel_serie') and purchase.feel_serie:
+                        invoice_series = purchase.feel_serie
+                    elif hasattr(purchase, 'serie_factura') and purchase.serie_factura:
+                        invoice_series = purchase.serie_factura
                     else:
-                        serie = ''
+                        invoice_series = ''
 
                     # Para el campo 'numero_dte'
-                    if hasattr(compra, 'num_factura') and compra.num_factura:
-                        numero_dte = compra.num_factura
-                    elif hasattr(compra, 'feel_numero') and compra.feel_numero:
-                        numero_dte = compra.feel_numero
+                    if hasattr(purchase, 'num_factura') and purchase.num_factura:
+                        dte_number = purchase.num_factura
+                    elif hasattr(purchase, 'feel_numero') and purchase.feel_numero:
+                        dte_number = purchase.feel_numero
                     else:
-                        numero_dte = ''
-                    documentos_operados += 1
-                    print(compra.name)
-                    dic = {
-                        'id': compra.id,
-                        'fecha': compra.date,
-                        'documento': compra.ref if compra.ref else compra.name,
-                        'proveedor': compra.partner_id.name if compra.partner_id else '',
-                        'nit': compra.partner_id.vat if compra.partner_id.vat else '',
-                        'serie': compra.feel_serie if hasattr(compra, 'feel_serie') and compra.feel_serie else (
-                            compra.serie_factura if hasattr(compra, 'serie_factura') and compra.serie_factura else ''),
-                        'numero_dte': compra.num_factura if hasattr(compra, 'num_factura') and compra.num_factura else (
-                            compra.feel_numero if hasattr(compra, 'feel_numero') and compra.feel_numero else ''),
+                        dte_number = ''
+                    processed_documents += 1
+                    print(purchase.name)
+                    document_data = {
+                        'id': purchase.id,
+                        'fecha': purchase.date,
+                        'documento': purchase.ref if purchase.ref else purchase.name,
+                        'proveedor': purchase.partner_id.name if purchase.partner_id else '',
+                        'nit': purchase.partner_id.vat if purchase.partner_id.vat else '',
+                        'serie': purchase.feel_serie if hasattr(purchase, 'feel_serie') and purchase.feel_serie else (
+                            purchase.serie_factura if hasattr(purchase, 'serie_factura') and purchase.serie_factura else ''),
+                        'numero_dte': purchase.num_factura if hasattr(purchase, 'num_factura') and purchase.num_factura else (
+                            purchase.feel_numero if hasattr(purchase, 'feel_numero') and purchase.feel_numero else ''),
                         'compra': 0,
                         'compra_exento': 0,
                         'servicio': 0,
@@ -176,233 +176,233 @@ class LibroCompras(models.AbstractModel):
                         'idp': 0
                     }
 
-                    for linea in compra.invoice_line_ids:
-                        print('JOYERIA linea documento=%s linea=%s producto=%s subtotal=%s impuestos=%s' % (compra.name, linea.id, linea.product_id.display_name or linea.name, linea.price_subtotal, linea.tax_ids.mapped('name')))
-                        impuesto_iva = False
-                        impuesto_iva = self._get_impuesto_iva(linea.tax_ids)
-                        if compra.currency_id.id != compra.company_id.currency_id.id:
-                            if ((linea.product_id or linea.name) and (('COMISION POR SERVICIOS' not in (linea.product_id.name or '')) or (
-                                    'COMISIONES BANCARIAS' not in (linea.product_id.name or '')) or (
-                                                                'Servicios y Comisiones' not in (linea.product_id.name or '')))):
-                                if len(linea.tax_ids) > 0:
-                                    monto_convertir_precio = linea.price_unit
+                    for invoice_line in purchase.invoice_line_ids:
+                        print('JOYERIA linea documento=%s linea=%s producto=%s subtotal=%s impuestos=%s' % (purchase.name, invoice_line.id, invoice_line.product_id.display_name or invoice_line.name, invoice_line.price_subtotal, invoice_line.tax_ids.mapped('name')))
+                        tax_iva = False
+                        tax_iva = self._has_vat_tax(invoice_line.tax_ids)
+                        if purchase.currency_id.id != purchase.company_id.currency_id.id:
+                            if ((invoice_line.product_id or invoice_line.name) and (('COMISION POR SERVICIOS' not in (invoice_line.product_id.name or '')) or (
+                                    'COMISIONES BANCARIAS' not in (invoice_line.product_id.name or '')) or (
+                                                                'Servicios y Comisiones' not in (invoice_line.product_id.name or '')))):
+                                if len(invoice_line.tax_ids) > 0:
+                                    amount_to_convert_before_tax = invoice_line.price_unit
 
-                                    if linea.product_id:
-                                        r = linea.tax_ids.compute_all(monto_convertir_precio, currency=compra.currency_id, quantity=linea.quantity, product=linea.product_id, partner=compra.partner_id)
+                                    if invoice_line.product_id:
+                                        tax_computation = invoice_line.tax_ids.compute_all(amount_to_convert_before_tax, currency=purchase.currency_id, quantity=invoice_line.quantity, product=invoice_line.product_id, partner=purchase.partner_id)
                                     else:
-                                        r = linea.tax_ids.compute_all(monto_convertir_precio, currency=compra.currency_id, quantity=linea.quantity, partner=compra.partner_id)
+                                        tax_computation = invoice_line.tax_ids.compute_all(amount_to_convert_before_tax, currency=purchase.currency_id, quantity=invoice_line.quantity, partner=purchase.partner_id)
 
-                                    for i in r['taxes']:
-                                        tax = self.env['account.tax'].browse(i['id'])
-                                        tax_name = (tax.name or i.get('name') or '').upper()
-                                        tax_amount = compra.currency_id._convert(i['amount'], compra.company_id.currency_id, compra.company_id, compra.invoice_date or compra.date)
+                                    for tax_entry in tax_computation['taxes']:
+                                        tax = self.env['account.tax'].browse(tax_entry['id'])
+                                        tax_name = (tax.name or tax_entry.get('name') or '').upper()
+                                        tax_amount = purchase.currency_id._convert(tax_entry['amount'], purchase.company_id.currency_id, purchase.company_id, purchase.invoice_date or purchase.date)
                                         if 'IDP' in tax_name:
-                                            dic['idp'] += tax_amount
+                                            document_data['idp'] += tax_amount
                                         elif 'IVA' in tax_name:
-                                            dic['iva'] += tax_amount
+                                            document_data['iva'] += tax_amount
                                         if tax.es_isr_retencion:
-                                            dic['isr_retencion'] += abs(tax_amount)
-                                        print('JOYERIA impuesto documento=%s linea=%s impuesto=%s monto_moneda=%s monto_compania=%s' % (compra.name, linea.id, tax_name, i['amount'], tax_amount))
+                                            document_data['isr_retencion'] += abs(tax_amount)
+                                        print('JOYERIA impuesto documento=%s linea=%s impuesto=%s monto_moneda=%s monto_compania=%s' % (purchase.name, tax.id, tax_name, tax_entry['amount'], tax_amount))
 
-                                    monto_convertir = compra.currency_id._convert(
-                                        linea.price_subtotal,
-                                        compra.company_id.currency_id,
-                                        compra.company_id,
-                                        compra.invoice_date or compra.date
+                                    converted_amount = purchase.currency_id._convert(
+                                        invoice_line.price_subtotal,
+                                        purchase.company_id.currency_id,
+                                        purchase.company_id,
+                                        purchase.invoice_date or purchase.date
                                     )
 
-                                    if linea.product_id.can_be_asset:
-                                        dic['compra_de_activos'] += monto_convertir
-                                    elif compra.tipo_gasto == 'combustible':
-                                        dic['combustible'] += monto_convertir
+                                    if invoice_line.product_id.can_be_asset:
+                                        document_data['compra_de_activos'] += converted_amount
+                                    elif purchase.tipo_gasto == 'combustible':
+                                        document_data['combustible'] += converted_amount
                                     else:
-                                        if compra.tipo_gasto == 'mixto':
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += monto_convertir
+                                        if purchase.tipo_gasto == 'mixto':
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += converted_amount
                                             else:
-                                                dic['servicio'] += monto_convertir
-                                        elif compra.tipo_gasto == 'importacion':
-                                            dic['importacion'] += monto_convertir
+                                                document_data['servicio'] += converted_amount
+                                        elif purchase.tipo_gasto == 'importacion':
+                                            document_data['importacion'] += converted_amount
                                         else:
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += monto_convertir
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += converted_amount
                                             else:
-                                                dic['servicio'] += monto_convertir
+                                                document_data['servicio'] += converted_amount
 
-                                    if compra.partner_id.pequenio_contribuyente:
-                                        dic['compra'] = 0
-                                        dic['servicio'] = 0
-                                        dic['importacion'] = 0
-                                        dic['compra_exento'] = 0
-                                        dic['servicio_exento'] = 0
-                                        dic['iva'] = 0
-                                        dic['pequenio'] += monto_convertir
+                                    if purchase.partner_id.pequenio_contribuyente:
+                                        document_data['compra'] = 0
+                                        document_data['servicio'] = 0
+                                        document_data['importacion'] = 0
+                                        document_data['compra_exento'] = 0
+                                        document_data['servicio_exento'] = 0
+                                        document_data['iva'] = 0
+                                        document_data['pequenio'] += converted_amount
 
-                                    # dic['total']
+                                    # document_data['total']
                                 else:
-                                    monto_convertir = compra.currency_id._convert(
-                                        linea.price_total,
-                                        compra.company_id.currency_id,
-                                        compra.company_id,
-                                        compra.invoice_date or compra.date
+                                    converted_amount = purchase.currency_id._convert(
+                                        invoice_line.price_total,
+                                        purchase.company_id.currency_id,
+                                        purchase.company_id,
+                                        purchase.invoice_date or purchase.date
                                     )
-                                    if linea.product_id.can_be_asset:
-                                        dic['compra_de_activos'] += monto_convertir
-                                    elif compra.tipo_gasto == 'combustible':
-                                        dic['combustible'] += monto_convertir
+                                    if invoice_line.product_id.can_be_asset:
+                                        document_data['compra_de_activos'] += converted_amount
+                                    elif purchase.tipo_gasto == 'combustible':
+                                        document_data['combustible'] += converted_amount
                                     else:
-                                        if compra.tipo_gasto == 'varios':
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += monto_convertir
+                                        if purchase.tipo_gasto == 'varios':
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += converted_amount
                                             else:
-                                                dic['servicio'] += monto_convertir
-                                        elif compra.tipo_gasto == 'importacion':
-                                            dic['importacion'] += monto_convertir
+                                                document_data['servicio'] += converted_amount
+                                        elif purchase.tipo_gasto == 'importacion':
+                                            document_data['importacion'] += converted_amount
                                         else:
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += monto_convertir
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += converted_amount
                                             else:
-                                                dic['servicio'] += monto_convertir
+                                                document_data['servicio'] += converted_amount
 
-                                    if compra.partner_id.pequenio_contribuyente:
-                                        dic['compra'] = 0
-                                        dic['servicio'] = 0
-                                        dic['importacion'] = 0
-                                        dic['compra_exento'] = 0
-                                        dic['servicio_exento'] = 0
-                                        dic['iva'] = 0
-                                        dic['pequenio'] += monto_convertir
+                                    if purchase.partner_id.pequenio_contribuyente:
+                                        document_data['compra'] = 0
+                                        document_data['servicio'] = 0
+                                        document_data['importacion'] = 0
+                                        document_data['compra_exento'] = 0
+                                        document_data['servicio_exento'] = 0
+                                        document_data['iva'] = 0
+                                        document_data['pequenio'] += converted_amount
 
                         else:
                             print("WELP")
-                            print(linea.product_id.name)
-                            print(linea.product_id)
-                            if ((linea.product_id or linea.name) and (('COMISION POR SERVICIOS' not in (linea.product_id.name or '')) or (
-                                    'COMISIONES BANCARIAS' not in (linea.product_id.name or '')) or (
-                                                                'Servicios y Comisiones' not in (linea.product_id.name or '')))):
-                                if len(linea.tax_ids) > 0:
-                                    # monto_convertir_precio = compra.currency_id.with_context(date=compra.invoice_date).compute(linea.price_unit, compra.company_id.currency_id)
+                            print(invoice_line.product_id.name)
+                            print(invoice_line.product_id)
+                            if ((invoice_line.product_id or invoice_line.name) and (('COMISION POR SERVICIOS' not in (invoice_line.product_id.name or '')) or (
+                                    'COMISIONES BANCARIAS' not in (invoice_line.product_id.name or '')) or (
+                                                                'Servicios y Comisiones' not in (invoice_line.product_id.name or '')))):
+                                if len(invoice_line.tax_ids) > 0:
+                                    # amount_to_convert_before_tax = purchase.currency_id.with_context(date=purchase.invoice_date).compute(invoice_line.price_unit, purchase.company_id.currency_id)
 
-                                    if linea.product_id:
-                                        r = linea.tax_ids.compute_all(linea.price_unit, currency=compra.currency_id, quantity=linea.quantity, product=linea.product_id, partner=compra.partner_id)
+                                    if invoice_line.product_id:
+                                        tax_computation = invoice_line.tax_ids.compute_all(invoice_line.price_unit, currency=purchase.currency_id, quantity=invoice_line.quantity, product=invoice_line.product_id, partner=purchase.partner_id)
                                     else:
-                                        r = linea.tax_ids.compute_all(linea.price_unit, currency=compra.currency_id, quantity=linea.quantity, partner=compra.partner_id)
+                                        tax_computation = invoice_line.tax_ids.compute_all(invoice_line.price_unit, currency=purchase.currency_id, quantity=invoice_line.quantity, partner=purchase.partner_id)
 
-                                    for i in r['taxes']:
-                                        tax = self.env['account.tax'].browse(i['id'])
-                                        tax_name = (tax.name or i.get('name') or '').upper()
-                                        tax_amount = compra.currency_id._convert(i['amount'], compra.company_id.currency_id, compra.company_id, compra.invoice_date or compra.date)
+                                    for tax_entry in tax_computation['taxes']:
+                                        tax = self.env['account.tax'].browse(tax_entry['id'])
+                                        tax_name = (tax.name or tax_entry.get('name') or '').upper()
+                                        tax_amount = purchase.currency_id._convert(tax_entry['amount'], purchase.company_id.currency_id, purchase.company_id, purchase.invoice_date or purchase.date)
                                         if 'IDP' in tax_name:
-                                            dic['idp'] += tax_amount
+                                            document_data['idp'] += tax_amount
                                         elif 'IVA' in tax_name:
-                                            dic['iva'] += tax_amount
+                                            document_data['iva'] += tax_amount
                                         if tax.es_isr_retencion:
-                                            dic['isr_retencion'] += abs(tax_amount)
-                                        print('JOYERIA impuesto documento=%s linea=%s impuesto=%s monto_moneda=%s monto_compania=%s' % (compra.name, linea.id, tax_name, i['amount'], tax_amount))
+                                            document_data['isr_retencion'] += abs(tax_amount)
+                                        print('JOYERIA impuesto documento=%s linea=%s impuesto=%s monto_moneda=%s monto_compania=%s' % (purchase.name, tax.id, tax_name, tax_entry['amount'], tax_amount))
 
-                                    if linea.product_id.can_be_asset:
-                                        dic['compra_de_activos'] += linea.price_subtotal
-                                    elif compra.tipo_gasto == 'combustible':
-                                        dic['combustible'] += linea.price_subtotal
+                                    if invoice_line.product_id.can_be_asset:
+                                        document_data['compra_de_activos'] += invoice_line.price_subtotal
+                                    elif purchase.tipo_gasto == 'combustible':
+                                        document_data['combustible'] += invoice_line.price_subtotal
                                     else:
-                                        if compra.tipo_gasto == 'mixto':
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += linea.price_subtotal
+                                        if purchase.tipo_gasto == 'mixto':
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += invoice_line.price_subtotal
                                             else:
-                                                dic['servicio'] += linea.price_subtotal
-                                        elif compra.tipo_gasto == 'importacion':
-                                            dic['importacion'] += linea.price_subtotal
+                                                document_data['servicio'] += invoice_line.price_subtotal
+                                        elif purchase.tipo_gasto == 'importacion':
+                                            document_data['importacion'] += invoice_line.price_subtotal
                                         else:
-                                            if linea.product_id.type == 'consu':
-                                                dic['compra'] += linea.price_subtotal
+                                            if invoice_line.product_id.type == 'consu':
+                                                document_data['compra'] += invoice_line.price_subtotal
                                             else:
-                                                dic['servicio'] += linea.price_subtotal
+                                                document_data['servicio'] += invoice_line.price_subtotal
 
-                                    if compra.partner_id.pequenio_contribuyente:
-                                        dic['compra'] = 0
-                                        dic['servicio'] = 0
-                                        dic['importacion'] = 0
-                                        dic['compra_exento'] = 0
-                                        dic['servicio_exento'] = 0
-                                        dic['iva'] = 0
-                                        dic['pequenio'] += linea.price_total
+                                    if purchase.partner_id.pequenio_contribuyente:
+                                        document_data['compra'] = 0
+                                        document_data['servicio'] = 0
+                                        document_data['importacion'] = 0
+                                        document_data['compra_exento'] = 0
+                                        document_data['servicio_exento'] = 0
+                                        document_data['iva'] = 0
+                                        document_data['pequenio'] += invoice_line.price_total
 
 
                                 else:
-                                    if linea.product_id.type == 'consu':
-                                        dic['compra_exento'] += linea.price_total
+                                    if invoice_line.product_id.type == 'consu':
+                                        document_data['compra_exento'] += invoice_line.price_total
                                     else:
-                                        dic['servicio_exento'] += linea.price_total
+                                        document_data['servicio_exento'] += invoice_line.price_total
 
-                                    if compra.partner_id.pequenio_contribuyente:
-                                        dic['compra'] = 0
-                                        dic['servicio'] = 0
-                                        dic['importacion'] = 0
-                                        dic['compra_exento'] = 0
-                                        dic['servicio_exento'] = 0
-                                        dic['pequenio'] += linea.price_total
+                                    if purchase.partner_id.pequenio_contribuyente:
+                                        document_data['compra'] = 0
+                                        document_data['servicio'] = 0
+                                        document_data['importacion'] = 0
+                                        document_data['compra_exento'] = 0
+                                        document_data['servicio_exento'] = 0
+                                        document_data['pequenio'] += invoice_line.price_total
 
-                    dic['total'] = dic['compra'] + dic['servicio'] + dic['compra_exento'] + dic['servicio_exento'] + \
-                                   dic['importacion'] + dic['iva'] + dic['idp'] + dic['pequenio'] + dic['compra_de_activos'] + dic[
-                                       'combustible'] - dic['isr_retencion']
+                    document_data['total'] = document_data['compra'] + document_data['servicio'] + document_data['compra_exento'] + document_data['servicio_exento'] + \
+                                   document_data['importacion'] + document_data['iva'] + document_data['idp'] + document_data['pequenio'] + document_data['compra_de_activos'] + document_data[
+                                       'combustible'] - document_data['isr_retencion']
 
-                    if compra.move_type in ['in_refund']:
-                        # dic['total'] = dic['compra'] - dic['servicio'] - dic['compra_exento'] - dic['servicio_exento'] - dic['importacion'] - dic['iva'] - dic['pequenio']
+                    if purchase.move_type in ['in_refund']:
+                        # document_data['total'] = document_data['compra'] - document_data['servicio'] - document_data['compra_exento'] - document_data['servicio_exento'] - document_data['importacion'] - document_data['iva'] - document_data['pequenio']
 
-                        dic['compra'] = dic['compra'] * -1
-                        dic['compra_exento'] = dic['compra_exento'] * -1
-                        dic['servicio'] = dic['servicio'] * -1
-                        dic['servicio_exento'] = dic['servicio_exento'] * -1
-                        dic['importacion'] = dic['importacion'] * -1
-                        dic['pequenio'] = dic['pequenio'] * -1
-                        dic['iva'] = dic['iva'] * -1
-                        dic['isr_retencion'] = dic['isr_retencion'] * -1
-                        dic['total'] = dic['total'] * -1
-                        dic['compra_de_activos'] = dic['compra_de_activos'] * -1
-                        dic['combustible'] = dic['combustible'] * -1
-                        dic['idp'] = dic['idp'] * -1
-                    for campo in ('compra', 'compra_exento', 'servicio', 'servicio_exento', 'importacion', 'pequenio', 'iva', 'idp', 'isr_retencion', 'total', 'compra_de_activos', 'combustible'):
-                        total[campo] += dic[campo]
-                    print('JOYERIA resumen documento=%s compra=%s servicio=%s iva=%s idp=%s total=%s' % (compra.name, dic['compra'], dic['servicio'], dic['iva'], dic['idp'], dic['total']))
+                        document_data['compra'] = document_data['compra'] * -1
+                        document_data['compra_exento'] = document_data['compra_exento'] * -1
+                        document_data['servicio'] = document_data['servicio'] * -1
+                        document_data['servicio_exento'] = document_data['servicio_exento'] * -1
+                        document_data['importacion'] = document_data['importacion'] * -1
+                        document_data['pequenio'] = document_data['pequenio'] * -1
+                        document_data['iva'] = document_data['iva'] * -1
+                        document_data['isr_retencion'] = document_data['isr_retencion'] * -1
+                        document_data['total'] = document_data['total'] * -1
+                        document_data['compra_de_activos'] = document_data['compra_de_activos'] * -1
+                        document_data['combustible'] = document_data['combustible'] * -1
+                        document_data['idp'] = document_data['idp'] * -1
+                    for key in ('compra', 'compra_exento', 'servicio', 'servicio_exento', 'importacion', 'pequenio', 'iva', 'idp', 'isr_retencion', 'total', 'compra_de_activos', 'combustible'):
+                        total[key] += document_data[key]
+                    print('JOYERIA resumen documento=%s compra=%s servicio=%s iva=%s idp=%s total=%s' % (purchase.name, document_data['compra'], document_data['servicio'], document_data['iva'], document_data['idp'], document_data['total']))
                     print()
-                    compras_lista.append(dic)
+                    purchases.append(document_data)
                 else:
-                    print(compra.name)
+                    print(purchase.name)
                     print("HA")
                     # GASTOS NO DEDUCIBLES
-                    dic = {
-                        'id': compra.id,
-                        'fecha': compra.date,
-                        'documento': compra.name,
-                        'proveedor': compra.partner_id.name if compra.partner_id else '',
-                        'nit': compra.partner_id.vat if compra.partner_id.vat else '',
-                        'total': compra.amount_total
+                    document_data = {
+                        'id': purchase.id,
+                        'fecha': purchase.date,
+                        'documento': purchase.name,
+                        'proveedor': purchase.partner_id.name if purchase.partner_id else '',
+                        'nit': purchase.partner_id.vat if purchase.partner_id.vat else '',
+                        'total': purchase.amount_total
                     }
-                    total_gastos_no += compra.amount_total
-                    gastos_no_lista.append(dic)
+                    total_non_deductible_expenses += purchase.amount_total
+                    non_deductible_expenses.append(document_data)
 
         # # Obtener el IVA por pagar y el total de retenciones desde el reporte de ventas
         # ventas_res = self.env['report.l10n_gt_joyeria.reporte_libro_ventas']._get_ventas({
-        #     'fecha_inicio': datos['fecha_inicio'],
-        #     'fecha_fin': datos['fecha_fin']
+        #     'date_start': report_data['date_start'],
+        #     'date_end': report_data['date_end']
         # })
         # total['iva_por_pagar'] = ventas_res['total']['iva']
         # total['valor_retencion_iva'] = ventas_res['total']['total_retenciones']
 
         # Obtener el crédito fiscal del período anterior
-        fecha_inicio = datetime.strptime(datos['fecha_inicio'], '%Y-%m-%d').date()
-        fecha_fin_anterior = fecha_inicio - timedelta(days=1)
-        fecha_inicio_anterior = fecha_fin_anterior - timedelta(days=4)
-        credito_fiscal_move = self.env['account.move'].search([('date', '>=', fecha_inicio_anterior),
-                                                               ('date', '<=', fecha_fin_anterior),
+        start_date = datetime.strptime(report_data['date_start'], '%Y-%m-%d').date()
+        previous_period_end_date = start_date - timedelta(days=1)
+        previous_period_start_date = previous_period_end_date - timedelta(days=4)
+        previous_fiscal_credit_move = self.env['account.move'].search([('date', '>=', previous_period_start_date),
+                                                               ('date', '<=', previous_period_end_date),
                                                                ('state', '=', 'posted'), (
                                                                    'fiscal_credit', '=',
                                                                    True)], limit=1, order='date desc')
-        if credito_fiscal_move:
-            total['credito_fiscal_periodo_anterior'] = credito_fiscal_move.amount_total
+        if previous_fiscal_credit_move:
+            total['credito_fiscal_periodo_anterior'] = previous_fiscal_credit_move.amount_total
 
-        return {'compras_lista': compras_lista, 'total': total, 'documentos_operados': documentos_operados,
-                'gastos_no': gastos_no_lista, 'total_gastos_no': total_gastos_no}
+        return {'compras_lista': purchases, 'total': total, 'documentos_operados': processed_documents,
+                'gastos_no': non_deductible_expenses, 'total_gastos_no': total_non_deductible_expenses}
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -414,5 +414,5 @@ class LibroCompras(models.AbstractModel):
             'doc_model': model,
             'data': data['form'],
             'docs': docs,
-            '_get_compras': self._get_compras,
+            '_get_compras': self._get_purchases,
         }
