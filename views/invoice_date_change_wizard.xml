@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="account_move_form_invoice_date_change" model="ir.ui.view">
+        <field name="name">account.move.form.invoice.date.change</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_invoice_date_change_wizard"
+                        type="object"
+                        string="Cambiar fecha de factura"
+                        groups="account.group_account_manager"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_invoice_date_change_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_gt_joyeria.invoice_date_change_wizard.form</field>
+        <field name="model">l10n_gt_joyeria.invoice_date_change_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirmar cambio de fecha">
+                <div class="alert alert-warning" role="alert">
+                    Se cambiará la fecha de la factura en Odoo. Este cambio no modifica el documento
+                    ya certificado en FEL. Confirme que la nueva fecha corresponde a la registrada en
+                    FEL. El usuario y las fechas anterior y nueva quedarán registrados en el chatter.
+                </div>
+                <group>
+                    <field name="move_id" invisible="1"/>
+                    <field name="current_invoice_date"/>
+                    <field name="new_invoice_date"/>
+                    <field name="change_reason"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_date_change"
+                            string="Confirmar cambio"
+                            type="object"
+                            class="oe_highlight"/>
+                    <button string="Cancelar" special="cancel" class="oe_link"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

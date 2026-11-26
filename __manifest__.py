@@ -13,6 +13,7 @@ y crea transferencias de devolución estándar pendientes de validación.
     'data': [
         'security/ir.model.access.csv',
         'views/credit_note_return_wizard.xml',
+        'views/invoice_date_change_wizard.xml',
         'views/views.xml',
         'views/templates.xml',
         'views/reporte_compras.xml',

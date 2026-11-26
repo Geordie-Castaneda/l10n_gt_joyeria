@@ -1,9 +1,30 @@
-from odoo import models, _
-from odoo.exceptions import UserError
+from odoo import fields, models, _
+from odoo.exceptions import AccessError, UserError
 
 
 class AccountMove(models.Model):
     _inherit = "account.move"
+
+    def action_open_invoice_date_change_wizard(self):
+        self.ensure_one()
+        if not self.env.user.has_group("account.group_account_manager"):
+            raise AccessError(_("Solo un responsable de contabilidad puede cambiar la fecha."))
+        if self.state != "posted" or self.move_type not in ("out_invoice", "out_refund"):
+            raise UserError(_("Solo se puede cambiar la fecha de facturas de cliente publicadas."))
+
+        invoice_date = fields.Date.to_string(self.invoice_date) if self.invoice_date else False
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Confirmar cambio de fecha"),
+            "res_model": "l10n_gt_joyeria.invoice_date_change_wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_move_id": self.id,
+                "default_current_invoice_date": invoice_date,
+                "default_new_invoice_date": invoice_date,
+            },
+        }
 
     def action_post(self):
         credit_notes = self.filtered(lambda move: move.move_type == "out_refund")
